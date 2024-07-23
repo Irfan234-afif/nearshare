@@ -21,7 +21,8 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
 class ReceiveFilePayloadCallback extends PayloadCallback {
-    private final Context context;
+//    static SimpleArrayMap<Long, Payload> payloads = new SimpleArrayMap<>();
+     final Context context;
     private final SimpleArrayMap<Long, Payload> incomingFilePayloads = new SimpleArrayMap<>();
     private final SimpleArrayMap<Long, Payload> completedFilePayloads = new SimpleArrayMap<>();
     private final SimpleArrayMap<Long, String> filePayloadFilenames = new SimpleArrayMap<>();
@@ -32,15 +33,41 @@ class ReceiveFilePayloadCallback extends PayloadCallback {
 
     @Override
     public void onPayloadReceived(String endpointId, Payload payload) {
+        Log.d(tag, "onPayloadReceived: as " + payload.getType());
         if (payload.getType() == Payload.Type.BYTES) {
             String payloadFilenameMessage = new String(payload.asBytes(), StandardCharsets.UTF_8);
-            long payloadId = addPayloadFilename(payloadFilenameMessage);
-            processFilePayload(payloadId);
-            Log.d(tag, "onPayloadReceived: as Byte");
+//            long payloadId = addPayloadFilename(payloadFilenameMessage);
+//            processFilePayload(payloadId);
+            Log.d(tag, "onPayloadReceived: as Byte" + payloadFilenameMessage);
         } else if (payload.getType() == Payload.Type.FILE) {
             // Add this to our tracking map, so that we can retrieve the payload later.
+//            String payloadFilenameMessage = new String(payload.asBytes(), StandardCharsets.UTF_8);
+//            long payloadId = addPayloadFilename(payloadFilenameMessage);
+//            processFilePayload(payloadId);
             incomingFilePayloads.put(payload.getId(), payload);
             Log.d(tag, "onPayloadReceived: as FILE");
+        }
+    }
+
+    @Override
+    public void onPayloadTransferUpdate(String endpointId, PayloadTransferUpdate update) {
+        Log.d(tag, "onPayloadTransferUpdate: Update getBytesTransferred : " + update.getBytesTransferred());
+        Log.d(tag, "onPayloadTransferUpdate: Update getTotalBytes : " + update.getTotalBytes());
+        if (update.getStatus() == PayloadTransferUpdate.Status.SUCCESS) {
+            long payloadId = update.getPayloadId();
+            Payload payload = incomingFilePayloads.remove(payloadId);
+            if(payload != null){
+
+
+                if (payload.getType() == Payload.Type.FILE) {
+
+                    completedFilePayloads.put(payloadId, payload);
+                    Log.d(tag, "onPayloadTransferUpdate: FIle telah diterima");
+                    processFilePayload(payloadId);
+                }
+            }
+        }
+        else if(update.getStatus() == PayloadTransferUpdate.Status.IN_PROGRESS){
         }
     }
 
@@ -120,17 +147,7 @@ class ReceiveFilePayloadCallback extends PayloadCallback {
         }
     }
 
-    @Override
-    public void onPayloadTransferUpdate(String endpointId, PayloadTransferUpdate update) {
-        if (update.getStatus() == PayloadTransferUpdate.Status.SUCCESS) {
-            long payloadId = update.getPayloadId();
-            Payload payload = incomingFilePayloads.remove(payloadId);
-            completedFilePayloads.put(payloadId, payload);
-            if (payload.getType() == Payload.Type.FILE) {
-                processFilePayload(payloadId);
-            }
-        }
-    }
+
 
     /** Copies a stream from one location to another. */
     private static void copyStream(InputStream in, OutputStream out) throws IOException {
